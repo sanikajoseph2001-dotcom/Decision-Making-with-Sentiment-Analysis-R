@@ -16,3 +16,7 @@ body {
 .reveal ol {
   font-size: 0.85em;
 }
+.reveal .slides section {
+  padding: 20px !important;
+}
+
