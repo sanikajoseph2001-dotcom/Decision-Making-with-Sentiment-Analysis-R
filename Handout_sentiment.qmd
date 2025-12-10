@@ -1,0 +1,316 @@
+---
+title: "Decision Making with Sentiment Analysis in R"
+
+author:
+  - name: "Sanika Parakatil Joseph"
+    email: "parakatil_joseph.sanika@stud.hs-fresenius.de"
+    affiliations: Fresenius University of Applied Science
+    address: "Zu den weisen"
+    city: "Cologne"
+    corresponding: true
+    
+abstract: |
+  Sentiment analysis transforms unstructured text into measurable indicators of positive or negative emotion, enabling organizations to understand how stakeholders feel about products, services, or events. Using R and the tidytext framework, sentiment scoring can be performed efficiently through tokenization, lexicon matching, and visualization. This handout demonstrates how sentiment analysis supports evidence-based decision-making by revealing patterns in customer opinions and identifying early warning signals in user feedback. A practical workflow and reproducible R code illustrate how emotional data can guide managerial actions and strategic choices. The included exercise reinforces the techniques discussed.
+  
+floatsintext: true
+
+format:
+  apaquarto-pdf:
+    documentmode: stu
+    course: Data Analysis for Decision-Making  (WS 2025/26)
+    professor: Prof. Dr. Stephan Huber
+    duedate: '2025-12-10'
+    keep-tex: false
+    fig-align: "left"
+    include-in-header:
+      text: |
+        \linespread{1.5} % 1.5 line spacing
+    number-sections: true
+  apaquarto-html:
+    toc: true
+    embed-resources: true
+    
+a4paper: true
+bibliography: References.bib
+csl: _extensions/wjschne/apaquarto/apa.csl
+reference-location: document
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+# Introduction
+
+Sentiment analysis is a text-mining method that identifies and
+quantifies the emotional tone expressed in written language, allowing
+unstructured text to be transformed into measurable indicators of
+positive or negative sentiment. This approach is valuable for
+decision-making because it provides managers with insight into customer
+perceptions, emerging issues, and reputation trends that traditional
+numerical data may not capture. Negative sentiment can signal
+dissatisfaction or operational risks, while positive sentiment may
+reveal strengths and opportunities for improvement or marketing.
+
+By reducing uncertainty and offering real-time feedback, sentiment
+analysis supports evidence-based decisions across product development,
+customer service, and strategic planning. This handout introduces the
+fundamentals of sentiment analysis in R using the tidytext framework,
+outlines the workflow for processing and scoring text data, and presents
+an applied example with accompanying R code. A short exercise is
+included to reinforce the techniques and demonstrate how sentiment
+insights can inform managerial action.[@hu2004mining].
+
+# Methods in R
+
+This section describes the procedure used to perform sentiment analysis
+in R using a small sample of Amazon Fine Food–style product reviews. The
+workflow follows a lexicon-based approach implemented with the tidytext
+framework and relies on the Bing sentiment lexicon to classify words as
+positive or negative. All steps are implemented in reproducible R code
+within the Quarto document.[@silge2017tidytext].
+
+## Data Import and Preparation
+
+The dataset `amazon_fine_food_review.csv` contains a subset of product
+reviews with the variables `Id` (review identifier), `ProductId`,
+`UserId`, `Score` (star rating from 1 to 5), `Time` (review date),
+`Summary`, and `Text` (full review). The file is stored in the same
+directory as the Quarto document and imported using readr. Basic
+preprocessing converts the date and calculates the length of each
+review.[@amazonfinefood2011].
+
+```{r}
+#| label: setup
+#| echo: true
+#| message: false
+#| warning: false
+
+
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(ggplot2)
+
+
+reviews <- read_csv("amazon_fine_food_review.csv")
+
+reviews <- reviews %>%
+  mutate(
+    Time = as.Date(Time),
+    review_length = str_count(Text, "\\S+")
+  )
+
+head(reviews)
+
+```
+
+## Tokenization and Lexicon Matching
+
+To enable sentiment analysis, the review text is first tokenized into
+individual words. The `unnest_tokens()` function from tidytext
+transforms each review into multiple rows with one word per row. These
+tokens are then matched with the Bing sentiment lexicon, which labels
+words as positive or negative. This approach allows each word to carry a
+sentiment value, enabling the calculation of review-level sentiment
+scores.
+
+```{r}
+#| label: sentiment-tokenize
+#| echo: true
+#| message: false
+#| warning: false
+
+bing_lexicon <- get_sentiments("bing")
+
+tokens <- reviews %>%
+  unnest_tokens(word, Text)
+
+sentiment_words <- tokens %>%
+  inner_join(bing_lexicon, by = "word")
+
+head(sentiment_words)
+
+```
+
+## Sentiment Scoring
+
+Sentiment scores are computed at the level of entire reviews. Each
+positive word is assigned a value of +1 and each negative word a value
+of −1. These values are summed per review to obtain a single sentiment
+score. Reviews with missing scores (no matched sentiment words) are
+assigned a value of zero.
+
+```{r}
+#| label: sentiment-score-per-review
+#| echo: true
+#| message: false
+#| warning: false
+
+# Assign +1 to positive, -1 to negative
+
+review_sentiment <- sentiment_words %>%
+mutate(score = if_else(sentiment == "positive", 1, -1)) %>%
+group_by(Id) %>%
+summarise(sentiment_score = sum(score), .groups = "drop")
+
+review_sentiment
+
+```
+
+```{r}
+#| label: sentiment-merge
+#| echo: true
+#| message: false
+#| warning: false
+
+# Merge sentiment scores back to the original reviews
+
+reviews_scored <- reviews %>%
+left_join(review_sentiment, by = "Id") %>%
+mutate(sentiment_score = replace_na(sentiment_score, 0))
+
+reviews_scored
+
+```
+
+## Visualisation
+
+Several plots are generated to summarise the sentiment patterns and
+illustrate how they can support decision-making. First, a bar chart
+shows the number of positive and negative words across all reviews.
+
+```{r}
+sentiment_summary <- sentiment_words %>%
+  count(sentiment) %>%
+  mutate(percent = n / sum(n) * 100)
+
+ggplot(sentiment_summary, aes(x = sentiment, y = percent, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(round(percent, 1), "%")), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("negative" = "#E74C3C", "positive" = "#2ECC71")) +
+  labs(
+    title = "Percentage Share of Positive vs. Negative Words",
+    x = "Sentiment Category",
+    y = "Percentage of Total Words"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+\newpage
+
+Second, a scatter plot examines the relationship between star ratings
+and sentiment scores.
+
+```{r}
+ggplot(reviews_scored, aes(x = Score, y = sentiment_score, color = factor(Score))) +
+  geom_point(alpha = 0.6, size = 3) +
+  scale_color_brewer(palette = "blues") +
+  labs(
+    title = "Rating vs Sentiment Score",
+    x = "Star Rating",
+    y = "Sentiment Score"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+\newpage
+
+Finally, a box plot compares sentiment scores across different products,
+which can help identify items associated with more negative feedback.
+
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+
+ggplot(reviews_scored, aes(x = ProductId, y = sentiment_score, fill = ProductId)) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "Sentiment Score by Product",
+    x = "Product ID",
+    y = "Sentiment Score"
+  )
+```
+
+# Results
+
+The results of the sentiment analysis reveal several clear patterns in
+the Amazon Fine Food sample. The bar plot shows that positive words
+appear more frequently than negative ones, suggesting that most
+customers describe their experiences in favorable terms, even if
+occasional issues are mentioned. The scatter plot further supports this
+by showing that higher star ratings tend to align with higher sentiment
+scores, meaning that what people write generally matches the score they
+give. The box plot shows differences between products, with some
+generating consistently positive sentiment while others receive more
+mixed or negative reactions. Together, these results provide a balanced
+picture of how customers feel across different items.
+
+# Discussion
+
+These findings highlight how sentiment analysis can deepen our
+understanding of customer feedback beyond simply looking at star
+ratings. The overall positive tone in the bar plot suggests strong
+product performance, but the presence of negative words reminds managers
+that even well-rated items can have recurring complaints worth
+addressing. The scatter plot’s alignment between text sentiment and
+numerical ratings shows that written reviews offer reliable emotional
+cues. Meanwhile, the box plot helps identify which products are
+consistently appreciated and which may require closer attention due to
+variability in sentiment. This combination of insights helps
+organisations focus on specific issues rather than relying solely on
+averages or surface-level summaries.
+
+# Conclusion
+
+Overall, the analysis demonstrates how sentiment analysis in R can turn
+written feedback into clear, useful insights for decision-making. By
+evaluating both the emotional tone of the text and its relationship to
+ratings, managers can better understand customer satisfaction, identify
+problem areas, and prioritise improvements. Even with a small dataset,
+visualising sentiment reveals patterns that would be easy to miss in raw
+reviews. As businesses increasingly depend on customer feedback to guide
+their decisions, sentiment analysis becomes an important and practical
+tool for interpreting emotions at scale.
+
+# Affidavit
+
+I hereby affirm that this submitted paper was authored unaided and
+solely by me. Additionally, no other sources than those in the reference
+list were used. Parts of this paper, including tables and figures, that
+have been taken either verbatim or analogously from other works have in
+each case been properly cited with regard to their origin and
+authorship. This paper either in parts or in its entirety, be it in the
+same or similar form, has not been submitted to any other examination
+board and has not been published.
+
+I acknowledge that the university may use plagiarism detection software
+to check my thesis. I agree to cooperate with any investigation of
+suspected plagiarism and to provide any additional information or
+evidence requested by the university.
+
+\newpage
+
+## Checklist
+
+-   [x] The handout contains 11 pages of text.
+-   [x] The submission contains the Quarto file of the handout.
+-   [x] The submission contains the Quarto file of the presentation.
+-   [x] The submission contains the HTML file of the handout.
+-   [x] The submission contains the HTML file of the presentation.
+-   [x] The submission contains the PDF file of the handout.
+-   [x] The submission contains the PDF file of the presentation.
+-   [x] The title page of the presentation and the handout contain
+    personal details (name, email, matriculation number).
+-   [x] The handout contains a bibliography, created using BibTeX with
+    an APA citation style.
+-   [x] Either the handout or the presentation contains R code that
+    demonstrates coding expertise.
+-   [x] The filled out Affidavit.
+-   [x] The link to the presentation and the handout published on
+    GitHub.
+
+\[Sanika Parakatil Joseph,\] \[10 Dec 2025,\] \[Cologne\]
+
+# References

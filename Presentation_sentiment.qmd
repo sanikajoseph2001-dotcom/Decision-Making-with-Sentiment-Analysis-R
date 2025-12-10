@@ -1,0 +1,245 @@
+---
+title: "Decision Making with Sentiment Analysis in R"
+author: "Sanika Parakatil Joseph - 400982266"
+format:
+  revealjs:
+    theme: simple
+    transition: slide
+    slide-number: true
+    code-fold: false
+    code-line-numbers: false
+    margin: 0.1
+    fontsize: 28px
+    css: styles.css
+---
+
+## About the Analysis
+
+::::: columns
+::: {.column width="50%"}
+**Packages Used:**
+
+-   `tidyverse` – data manipulation and plotting\
+-   `tidytext` – text mining and tokenization\
+-   `lubridate` – date handling\
+-   `ggplot2` – visualisation\
+:::
+
+::: {.column width="50%"}
+**Amazon Fine Food Review:**
+
+-   Product reviews (cookies, coffee, tea, granola)\
+-   Variables: star rating, text, date, product ID\
+-   Goal: quantify review sentiment and relate it to ratings\
+-   Application: support decisions about product quality and marketing\
+:::
+:::::
+
+------------------------------------------------------------------------
+
+## Key Concepts
+
+-   **Sentiment analysis** Converts written text into measurable emotional signals by identifying whether language expresses positivity, negativity, or neutrality. This allows organisations to quantify customer feelings instead of relying only on subjective reading.\
+-   **Lexicon-based methods** These approaches classify words by matching them to predefined dictionaries such as the Bing lexicon, which labels words as positive or negative. They are fast, transparent, and easy to interpret, making them ideal for business applications.\
+-   **Sentiment score** Each review receives an overall score by summing the polarity of the words it contains, giving a numerical representation of emotion. Higher scores indicate more positive language, while negative scores highlight dissatisfaction.\
+-   **Decision-making** Analyzing sentiment patterns helps identify products with recurring negative feedback, service gaps, or early warning signs of risk. Managers can use these insights to prioritise improvements, adjust marketing, or intervene before ratings decline.
+
+------------------------------------------------------------------------
+
+## Step 1: Install & Load Packages
+
+```{r}
+
+#| echo: true
+#| message: false
+#| warning: false
+
+library(tidyverse)
+library(tidytext)
+library(lubridate)
+library(ggplot2)
+library(plotly)
+```
+
+![](images/load_packages.png){width="50%" height="30%"}
+
+**Purpose:** They provide the core tools for importing data, tokenizing text, applying sentiment lexicons, and creating plots.
+
+------------------------------------------------------------------------
+
+## Step 2: Load & Prepare Data
+
+```{r}
+
+#| echo: true
+#| message: false
+#| warning: false
+
+library(tidyverse)
+reviews <- read_csv("amazon_fine_food_review.csv")
+
+reviews <- reviews %>%
+  mutate(
+    Time = as.Date(Time),
+    review_length = str_count(Text, "\\S+")
+  )
+
+head(reviews)
+
+```
+
+**Purpose:** We use a small Amazon Fine Food–style dataset.
+
+Each row is a review with a star rating (Score) and review text (Text).
+
+We convert the time variable to a Date and compute review length (number of words).
+
+------------------------------------------------------------------------
+
+## Step 3: Tokenize Text & Join Sentiment Lexicon
+
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+
+bing_lexicon <- get_sentiments("bing")
+
+tokens <- reviews %>%
+  unnest_tokens(word, Text)
+
+sentiment_words <- tokens %>%
+  inner_join(bing_lexicon, by = "word")
+
+head(sentiment_words)
+
+```
+
+**Purpose:**unnest_tokens() splits each review into individual words.
+
+The Bing lexicon classifies words as positive or negative. The join keeps only words that carry sentiment.
+
+## Step 4: Compute Sentiment Scores
+
+```{r}
+#| echo: true
+#| message: false
+#| warning: false
+
+review_sentiment <- sentiment_words %>%
+  mutate(score = if_else(sentiment == "positive", 1, -1)) %>%
+  group_by(Id) %>%
+  summarise(sentiment_score = sum(score), .groups = "drop")
+
+reviews_scored <- reviews %>%
+  left_join(review_sentiment, by = "Id") %>%
+  mutate(sentiment_score = replace_na(sentiment_score, 0))
+
+reviews_scored
+
+```
+
+**Key Point:** Each positive word contributes +1; each negative word contributes −1.
+
+Scores are summed at the review level and Reviews with no sentiment words receive a score of 0.
+
+------------------------------------------------------------------------
+
+## Step 5: Visualising Sentiment (Bar Plot)
+
+```{r}
+sentiment_summary <- sentiment_words %>%
+  count(sentiment) %>%
+  mutate(percent = n / sum(n) * 100)
+
+ggplot(sentiment_summary, aes(x = sentiment, y = percent, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  geom_text(aes(label = paste0(round(percent, 1), "%")), vjust = -0.5, size = 5) +
+  scale_fill_manual(values = c("negative" = "#E74C3C", "positive" = "#2ECC71")) +
+  labs(
+    title = "Percentage Share of Positive vs. Negative Words",
+    x = "Sentiment Category",
+    y = "Percentage of Total Words"
+  ) +
+  theme_minimal(base_size = 14)
+
+```
+
+**Key Point:** This bar chart shows whether positive or negative words dominate the sample.
+
+Managers can quickly assess whether feedback is generally favourable or problematic
+
+------------------------------------------------------------------------
+
+## Step 6: Rating vs. Sentiment Score (Scatter Plot)
+
+```{r}
+plot_ly(
+  reviews_scored,
+  x = ~Score,
+  y = ~sentiment_score,
+  z = ~review_length,
+  type = "scatter3d",
+  mode = "markers",
+  marker = list(
+    color = ~factor(Score),
+    colors = c("red", "orange", "yellow", "lightblue", "blue"),
+    size = 5
+  )
+)
+```
+
+**Observation:** Reviews with higher star ratings tend to have higher sentiment scores.
+
+If many low-score reviews have strongly negative sentiment, the product may require improvement.
+
+------------------------------------------------------------------------
+
+## Sentiment by Product (Boxplot)
+
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+
+ggplot(reviews_scored, aes(x = ProductId, y = sentiment_score, fill = ProductId)) +
+  geom_boxplot() +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "Sentiment Score by Product",
+    x = "Product ID",
+    y = "Sentiment Score"
+  )
+```
+
+**Observation:** This plot compares sentiment across different products. Products with lower median scores or many negative outliers may need closer attention
+
+## Business Applications
+
+-   **Product quality management**: Identify items with consistently negative sentiment and prioritise quality checks.\
+-   **Customer service**: Detect themes in negative reviews and design targeted service interventions.\
+-   **Marketing**: Emphasise features associated with strongly positive sentiment in campaigns.\
+-   **Risk monitoring**: Track sentiment over time to detect early warning signals before ratings drop.
+
+![](images/business_applications.jpg){width="70%"})
+
+## Exercise: Try With Another Dataset
+
+-   Use the same code structure with a different text dataset (e.g., your own product reviews).\
+-   Replace `amazon_fine_food_review.csv` with your file.\
+-   Re-run tokenisation, lexicon matching, scoring, and visualisation.\
+-   Compare whether the relationship between ratings and sentiment is similar.
+
+------------------------------------------------------------------------
+
+## Conclusion
+
+-   Sentiment analysis reveals emotional patterns in customer reviews.
+-   R makes it easy to score, visualize, and interpret sentiment at scale.
+-   Insights help managers spot issues early and make better product decisions.
+-   A simple method with powerful impact on decision-making.
+
+------------------------------------------------------------------------
+
+## Thank You! {.center}
+
+**Questions?**

@@ -1,0 +1,13 @@
+Id,ProductId,UserId,Score,Time,Summary,Text
+1,B001E4KFG0,U1,5,01-01-2011,Fantastic cookies,These cookies taste amazing and stay fresh for a long time. I am very happy with this purchase.
+2,B001E4KFG0,U2,4,03-01-2011,Good but a bit sweet,"The cookies are good and crunchy, but they are a little too sweet for my taste."
+3,B001E4KFG0,U3,2,05-01-2011,Too dry,I found these cookies very dry and disappointing. Would not buy again.
+4,B008J4RP1U,U4,1,07-01-2011,Terrible quality,The product arrived stale and broken. This was a horrible experience.
+5,B008J4RP1U,U5,3,10-01-2011,Average snack,Nothing special. It is an okay snack if you are not too picky.
+6,B000HDK0DC,U6,5,12-01-2011,Excellent coffee,"Rich flavor, strong aroma, and smooth taste. This coffee is absolutely excellent."
+7,B000HDK0DC,U7,4,14-01-2011,Good but expensive,"The coffee tastes very good, but I think the price is a bit high."
+8,B000HDK0DC,U8,2,16-01-2011,Bitter and burnt,The coffee tasted bitter and burnt. I did not enjoy this at all.
+9,B000SQNQIQ,U9,5,18-01-2011,Perfect tea,This tea is perfect for relaxing in the evening. Gentle taste and very soothing.
+10,B000SQNQIQ,U10,3,19-01-2011,Decent but weak,The tea is decent but the flavor feels weak and watery even after steeping longer.
+11,B000SQNQIQ,U11,1,21-01-2011,Worst tea ever,This is the worst tea I have tried. It has a strange chemical taste and made me feel sick.
+12,B002HQ0Z1U,U12,4,23-01-2011,Tasty granola,"The granola is tasty and crunchy. Great with yogurt, though the package could be bigger."
